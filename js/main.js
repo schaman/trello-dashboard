@@ -5,7 +5,8 @@ var authenticationSuccess = function() {
 };
 
 Trello.authorize({
-  type: 'popup',
+  type: 'redirect',//'popup',
+  //persist: false,
   name: 'Prorealnost Trello Dashboard',
   scope: {
     read: 'true',
