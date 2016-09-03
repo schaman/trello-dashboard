@@ -1,12 +1,10 @@
 ---
-layout: base
+layout: dashboard
+group: navigation
+title: Overview
+js: index
 ---
 
-<div class="container">
-  <h1>Hello, <span id="memberFullName">world</span>!</h1>
-  <div id="boards"></div>
+<h1 class="page-header">Overview</h1>
 
-  <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
-  <script src="https://api.trello.com/1/client.js?key={{ site.trello_app_key }}"></script>
-  <script type="text/javascript" src="js/main.js"></script>
-</div>
+<ul id="content"></ul>
