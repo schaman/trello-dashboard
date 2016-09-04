@@ -29,6 +29,58 @@ function startChecking(title, checker) {
   checker(failCheck, endChecking);
 }
 
+function getCards(listIds, cb) {
+  var lists = [];
+  var cards = [];
+
+  for (var l = listIds.length - 1; l >= 0; l--) {
+    Trello.get('lists/' + listIds[l], {cards: 'open'}, function(list) {
+      lists.push(list);
+
+      // start this when all lists fetched
+      if (lists.length == listIds.length) {
+        for (var i = lists.length - 1; i >= 0; i--) {
+          for (var k = lists[i].cards.length - 1; k >= 0; k--) {
+            var card = lists[i].cards[k];
+            cards.push(card);
+          }
+        }
+
+        // callback when all cards are in
+        cb(cards);
+      }
+    })
+  }
+}
+
+function getBoardCards(boardId, excludeListIds, cb) {
+  var cards = [];
+
+  // get all lists on board
+  Trello.get('boards/' + boardId + '/lists', {cards: 'open'}, function(lists) {
+
+    // exclude lists
+    lists = lists.filter(function(list){
+      return excludeListIds.indexOf(list.id) < 0;
+    })
+
+    // find all cards, exclude labelled
+    for (var i = lists.length - 1; i >= 0; i--) {
+      lists[i].cards = lists[i].cards.filter(function(card){
+        return card.labels.length == 0;
+      })
+
+      for (var k = lists[i].cards.length - 1; k >= 0; k--) {
+        var card = lists[i].cards[k];
+
+        cards.push(card);
+      }
+    }
+
+    cb(cards);
+  });
+}
+
 $(function(){
   $(document).on('trelloReady', function(event, myMemberId){
 
@@ -38,36 +90,22 @@ $(function(){
         var boardId = '572a003f47d04696986d1b24'; // Победитель (доска)
         var excludeListId = '5770c623e27d38baccabb740'; // МЕТА (список)
 
-        // get all lists on board
-        Trello.get('boards/' + boardId + '/lists', {cards: 'open'}, function(lists) {
+        getBoardCards(boardId, excludeListId, function(cards) {
+          for (var i = cards.length - 1; i >= 0; i--) {
+            var card = cards[i];
 
-          // exclude "meta" list
-          lists = lists.filter(function(list){
-            return list.id !== excludeListId;
-          })
-
-          // find all cards, exclude labelled
-          for (var i = lists.length - 1; i >= 0; i--) {
-            lists[i].cards = lists[i].cards.filter(function(card){
-              return card.labels.length == 0;
-            })
-
-            for (var k = lists[i].cards.length - 1; k >= 0; k--) {
-              var card = lists[i].cards[k];
-
-              // check if due date exists
-              if (!card.due) {
-                failCheck(card, 'Отсутствует срок');
-              } if (card.due < (new Date()).toISOString()) {
-                failCheck(card, 'Просрочена');
-              }
+            // check if due date exists
+            if (!card.due) {
+              failCheck(card, 'Отсутствует срок');
+            } if (card.due < (new Date()).toISOString()) {
+              failCheck(card, 'Просрочена');
             }
           }
 
           endChecking();
-        }
-      );
-    });
+        })
+      }
+    );
 
     startChecking(
       'Просроченные задачи отсутствуют',
@@ -81,30 +119,20 @@ $(function(){
           '56b2ef481d2a8eadb5cd5d26'
         ];
 
-        // get all lists on board
-        Trello.get('boards/' + boardId + '/lists', {cards: 'open'}, function(lists) {
+        getCards(includeListIds, function(cards){
+          for (var i = cards.length - 1; i >= 0; i--) {
+            var card = cards[i];
 
-          // all included lists
-          lists = lists.filter(function(list){
-            return includeListIds.indexOf(list.id) >= 0;
-          })
-
-          // find all cards
-          for (var i = lists.length - 1; i >= 0; i--) {
-            for (var k = lists[i].cards.length - 1; k >= 0; k--) {
-              var card = lists[i].cards[k];
-
-              // check if due date exists
-              if (card.due && card.due < (new Date()).toISOString()) {
-                failCheck(card, 'Просрочена');
-              }
+            // check if due date exists
+            if (card.due && card.due < (new Date()).toISOString()) {
+              failCheck(card, 'Просрочена');
             }
           }
 
           endChecking();
-        }
-      );
-    });
+        });
+      }
+    );
 
     startChecking(
       'Все новые лиды прозвонены',
@@ -114,70 +142,48 @@ $(function(){
           '57ab5914b419ce8b3eaa798c'  // Продажи по трафику Лего — Свежие лиды
         ];
 
-        var lists = [];
+        getCards(includeListIds, function(cards){
+          for (var i = cards.length - 1; i >= 0; i--) {
+            var card = cards[i];
 
-        for (var l = includeListIds.length - 1; l >= 0; l--) {
-          Trello.get('lists/' + includeListIds[l], {cards: 'open'}, function(list) {
-            lists.push(list);
+            failCheck(card, 'Лид не прозвонен');
+          }
 
-            // start this when all lists fetched
-            if (lists.length == includeListIds.length) {
-              // any card us an error
-              for (var i = lists.length - 1; i >= 0; i--) {
-                for (var k = lists[i].cards.length - 1; k >= 0; k--) {
-                  var card = lists[i].cards[k];
-
-                  failCheck(card, 'Лид не прозвонен');
-
-                  // пропускаем оранжевую метку "META"
-                  // if (!(card.labels.length > 0
-                  // && card.labels[0].name !== "57ab590c84e677fd36e08dc8")) {
-                  //  failCheck(card, 'Лид не прозвонен');
-                  // }
-                }
-              }
-
-              endChecking();
-            }
-          })
-        }
+          endChecking();
+        });
       }
     );
 
     startChecking(
       'Все договоренности о созвоне выполнены',
       function(failCheck, endChecking) {
-        var boardIds = [
-          '569f82270e721e71ac52311c', // Продажи (доска)
-          '57ab590ca071b05c3500cf53'  // Продажи по трафику Лего (доска)
+        var includeListIds = [
+          // Продажи (доска)
+          '56a5dcb3c2058bcc8d36f312', // Дозваниваюсь
+          '573304f2ffb312d29a156193', // Утепляю
+          '56a5dcceb432ecf074681bca', // В работе (созданы договорённости)
+          '56a5dce071e24b113b761a98', // Горячие
+          '56fa7cce00d210716bde0476', // Внес предоплату
+          // Продажи по трафику Лего (доска)
+          '57ab5918b6ce1ee87dad2e4f', // Дозваниваюсь
+          '57ab591c36e3767f77743e61', // В работе
+          '57ab59251706c8148ebb31f6', // Внес предоплату
         ]
 
-        var boardsChecked = 0;
+        getCards(includeListIds, function(cards){
+          for (var i = cards.length - 1; i >= 0; i--) {
+            var card = cards[i];
 
-        for (var nBoard = boardIds.length - 1; nBoard >= 0; nBoard--) {
-          boardId = boardIds[nBoard];
-
-          // get all lists on board
-          Trello.get('boards/' + boardId + '/lists', {cards: 'open'}, function(lists) {
-            for (var i = lists.length - 1; i >= 0; i--) {
-              for (var k = lists[i].cards.length - 1; k >= 0; k--) {
-                var card = lists[i].cards[k];
-
-                // check if due date exists
-                if (!card.due) {
-                  failCheck(card, 'Отсутствует срок');
-                } if (card.due < (new Date()).toISOString()) {
-                  failCheck(card, 'Просрочена');
-                }
-              }
+            // check if due date exists
+            if (!card.due) {
+              failCheck(card, 'Отсутствует срок');
+            } if (card.due < (new Date()).toISOString()) {
+              failCheck(card, 'Просрочена');
             }
+          }
 
-            boardsChecked++;
-            if (boardsChecked == boardIds.length) {
-              endChecking();
-            }
-          })
-        }
+          endChecking();
+        });
       }
     );
 
