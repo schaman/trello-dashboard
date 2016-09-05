@@ -1,7 +1,8 @@
 var authenticationFailure = function() { console.log('Failed authentication'); };
 var authenticationSuccess = function() {
   console.log('Successful authentication');
-  getMyMemberId();
+  trelloReady();
+  getMyMemberInfo();
 };
 
 Trello.authorize({
@@ -16,24 +17,14 @@ Trello.authorize({
   error: authenticationFailure
 });
 
-var myMemberId, myMemberInfo;
-
-function getMyMemberId() {
-  Trello.get('tokens/' + Trello.token(), function(param){
-    myMemberId = param.idMember;
-    console.log(myMemberId);
-    trelloReady();
-    getMyMemberInfo();
-  })
-}
-
 function getMyMemberInfo() {
-  Trello.get('members/' + myMemberId, function(param){
-    myMemberInfo = param;
-    $('#memberFullName').text(myMemberInfo.fullName);
+  Trello.get('member/me', function(param){
+    $(function(){
+      $('#memberFullName').text(param.fullName);
+    })
   })
 }
 
 function trelloReady() {
-  $(document).trigger('trelloReady', [ myMemberId ]);
+  document.dispatchEvent(new Event('trelloReady'));
 }
