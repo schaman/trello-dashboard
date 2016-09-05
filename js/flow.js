@@ -23,17 +23,17 @@ function setStates(lists) {
 }
 
 function render() {
-  var barHeight = 20;
+  var barHeight = 26;
 
-  var margin = {top: 5, right: 5, bottom: 20, left: 130},
-      width = 960 - margin.left - margin.right;
-
-  var height = barHeight * data.length;
+  var margin = {top: 10, right: 150, bottom: 20, left: 10},
+      width = 1120 - margin.left - margin.right
+      height = barHeight * data.length;
 
   // set size and margins
   var chart = d3.select(".chart")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", barHeight * data.length + margin.top + margin.bottom)
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right))
     .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
@@ -63,10 +63,11 @@ function render() {
   y.domain(data.map(function(d) { return d.card.name; }));
   y.rangeRound([0, height]);
 
-  var yAxis = d3.axisLeft(y);
+  var yAxis = d3.axisRight(y);
 
   chart.append("g")
       .attr("class", "y axis")
+      .attr("transform", "translate(" + width + ", 0)")
       .call(yAxis);
 
   // tip
