@@ -22,67 +22,77 @@ function setStates(lists) {
   })
 }
 
+var barHeight = 26;
+
+var margin = {top: 10, right: 170, bottom: 20, left: 10},
+    width = 1120 - margin.left - margin.right
+    height = barHeight * data.length;
+
+// set size and margins
+var svg = d3.select(".chart")
+    .attr("width", "100%")
+    .attr("height", "100%");
+
+var chart = svg.append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// tip
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-10, 0])
+  .html(function(d) {
+    var start = moment(d.start);
+    var finish = moment(d.finish);
+    return states[d.state].name + ' ' + 
+      start.format('D MMM') + ' – ' + finish.format('D MMM') +
+      ' (' + finish.diff(start, 'days') + ' days)';
+  })
+
+chart.call(tip);
+
+// x – time scale
+
+var x = d3.scaleTime()
+    .range([0, width]);
+
+var xAxis = d3.axisBottom(x);
+
+chart.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+
+// y - person scale
+var y = d3.scaleBand();
+
+var yAxis = d3.axisRight(y);
+
+chart.append("g")
+    .attr("class", "y axis")
+    .attr("transform", "translate(" + width + ", 0)")
+    .call(yAxis);
+
 function render() {
-  var barHeight = 26;
+  height = barHeight * data.length;
 
-  var margin = {top: 10, right: 170, bottom: 20, left: 10},
-      width = 1120 - margin.left - margin.right
-      height = barHeight * data.length;
-
-  // set size and margins
-  var chart = d3.select(".chart")
-      .attr("width", "100%")
-      .attr("height", "100%")
-      .attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right))
-    .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-  // x – time scale
-
-  var x = d3.scaleTime()
-      .domain([
-        d3.min(data, function(person){
-          return d3.min(person.story, function(d){ return d.start })
-        }),
-        d3.max(data, function(person){
-          return d3.max(person.story, function(d){ return d.finish })
-        })
-      ])
-      .range([0, width]);
-
-  var xAxis = d3.axisBottom(x);
-
-  chart.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + barHeight * data.length + ")")
-      .call(xAxis);
-
-  // y - person scale
-  var y = d3.scaleBand();
+  x.domain([
+    d3.min(data, function(person){
+      return d3.min(person.story, function(d){ return d.start })
+    }),
+    d3.max(data, function(person){
+      return d3.max(person.story, function(d){ return d.finish })
+    })
+  ]);
 
   y.domain(data.map(function(d) { return d.card.name; }));
   y.rangeRound([0, height]);
 
-  var yAxis = d3.axisRight(y);
-
-  chart.append("g")
-      .attr("class", "y axis")
-      .attr("transform", "translate(" + width + ", 0)")
+  chart.selectAll("g.y.axis")
       .call(yAxis);
 
-  // tip
-  var tip = d3.tip()
-    .attr('class', 'd3-tip')
-    .offset([-10, 0])
-    .html(function(d) {
-      var start = moment(d.start);
-      var finish = moment(d.finish);
-      return states[d.state].name + ' ' + 
-        start.format('D MMM') + ' – ' + finish.format('D MMM') +
-        ' (' + finish.diff(start, 'days') + ' days)';
-    })
-
-  chart.call(tip);
+  chart.selectAll("g.x.axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
 
   // shift every next bar down
   var person = chart.selectAll("g.person")
@@ -105,6 +115,7 @@ function render() {
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide)
 
+  svg.attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right));
 }
 
 function tellStory(card, story){
@@ -164,12 +175,7 @@ document.addEventListener('trelloReady', function(event){
     })
 
     // запоминаем, сколько всего студентов
-    totalStudentCount = cards.length;    
-
-    // 575fe11ee7cfb0b5b5bc7814
-    //cards = cards.filter(function(card){
-    //  return card.id == '575fe11ee7cfb0b5b5bc7814';
-    //})
+    totalStudentCount = cards.length;
 
     cards.map(function(card){
       Trello.get('card/' + card.id + '/actions', function(card, actions){
@@ -205,15 +211,6 @@ document.addEventListener('trelloReady', function(event){
         });
 
         tellStory(card, story);
-
-        /*
-        $('#content').append(
-          '<h5>' + card.name + '</h5>' +
-          '<pre>' + JSON.stringify(story, null, 2) + '</pre>' +
-          '<pre>' + JSON.stringify(card, null, 2) + '</pre>' +
-          '<pre>' + JSON.stringify(actions, null, 2) + '</pre>'
-        );
-        */
       }.bind(null, card))
     })
   })
