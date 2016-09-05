@@ -1,11 +1,11 @@
 ---
 layout: dashboard
 group: navigation
-title: Flow
+title: Students
 js: flow
 ---
 
-<h1 class="page-header">Flow</h1>
+<h1 class="page-header">Students</h1>
 
 <style>
 
@@ -19,6 +19,12 @@ js: flow
   fill: #ccc;
   font: 10px sans-serif;
   text-anchor: end;
+}
+
+.chart .person text {
+  fill: #600;
+  font: 10px sans-serif;
+  text-anchor: start;
 }
 
 .axis text {
@@ -37,6 +43,33 @@ js: flow
   shape-rendering: crispEdges;
 }
 
+.d3-tip {
+  line-height: 1;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+/* Creates a small triangle extender for the tooltip */
+.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  content: "\25BC";
+  position: absolute;
+  text-align: center;
+}
+
+/* Style northward tooltips differently */
+.d3-tip.n:after {
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+}
 </style>
 
 <svg class="chart"></svg>
@@ -44,3 +77,5 @@ js: flow
 <div id="content"></div>
 
 <script type="text/javascript" src="/js/d3/d3.min.js"></script>
+<script type="text/javascript" src="/js/lib/d3.tip.js"></script>
+<script type="text/javascript" src="/js/lib/moment-with-locales.js"></script>
