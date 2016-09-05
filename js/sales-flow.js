@@ -94,26 +94,31 @@ function render() {
       .attr("transform", "translate(0," + height + ")")
       .call(xAxis);
 
+  // (data) is an array/iterable thing, second argument is an ID generator function
+  var people = chart.selectAll("g.person").data(data);
+
+  people.exit().remove();
+
   // shift every next bar down
-  var person = chart.selectAll("g.person")
-      .data(data)
-    .enter().append("g")
+  var person = people.enter().append("g")
       .attr("class", "person")
       .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; });
 
-  var bar = person.selectAll("g")
-      .data(function(d) { return d.story; })
-    .enter().append("g")
-      .attr("class", "stage");
+  var bars = chart.selectAll("g.person").selectAll(".bar")
+      .data(function(d) { return d.story; }, function(d) { return d.state; });
 
-  // add bars
-  bar.append("rect")
-      .attr("x", function(d) { return x(d.start); })
+  bars.enter().append("rect")
+      .attr("class", "bar")
       .attr("fill", function(d) { return z(d.state); })
-      .attr("width", function(d) { return x(d.finish) - x(d.start); })
       .attr("height", barHeight - 1)
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide)
+      .attr("x", function(d) { return x(d.start); })
+      .attr("width", function(d) { return x(d.finish) - x(d.start); })
+
+  bars
+      .attr("x", function(d) { return x(d.start); })
+      .attr("width", function(d) { return x(d.finish) - x(d.start); })
 
   svg.attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right));
 }
@@ -136,9 +141,9 @@ function tellStory(card, story){
     story: scenes
   })
 
-  if (data.length == totalStudentCount) {
+  //if (data.length == totalStudentCount) {
     render();
-  }
+  //}
 }
 
 // '57ab590ca071b05c3500cf53' // Продажи по трафику Лего (доска)
