@@ -53,11 +53,16 @@ function render(card, story) {
   chart.select(".x").attr("transform", "translate(0," + barHeight * data.length + ")");
 
   // shift every next bar down
-  var bar = chart.selectAll("g.person")
-      .data(story)
+  var person = chart.selectAll("g.person")
+      .data(data)
     .enter().append("g")
-      .attr("class", "person");
+      .attr("class", "person")
       .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; });
+
+  var bar = person.selectAll("g")
+      .data(function(d) { return d.story; })
+    .enter().append("g")
+      .attr("class", "stage");
 
   // add bars
   bar.append("rect")
@@ -108,9 +113,9 @@ document.addEventListener('trelloReady', function(event){
     })
 
     // 575fe11ee7cfb0b5b5bc7814
-    cards = cards.filter(function(card){
-      return card.id == '575fe11ee7cfb0b5b5bc7814';
-    })
+    //cards = cards.filter(function(card){
+    //  return card.id == '575fe11ee7cfb0b5b5bc7814';
+    //})
 
     cards.map(function(card){
       Trello.get('card/' + card.id + '/actions', function(card, actions){
