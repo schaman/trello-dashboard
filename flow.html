@@ -1,0 +1,44 @@
+---
+layout: dashboard
+group: navigation
+title: Flow
+js: flow
+---
+
+<h1 class="page-header">Flow</h1>
+
+<style>
+
+.chart rect {
+  fill: steelblue;
+}
+
+.chart text {
+  fill: #ccc;
+  font: 10px sans-serif;
+  text-anchor: end;
+}
+
+.axis text {
+  font: 10px sans-serif;
+  fill: black;
+}
+
+.axis.x text {
+  text-anchor: middle;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+</style>
+
+<svg class="chart"></svg>
+
+<div id="content"></div>
+
+<script type="text/javascript" src="/js/d3/d3.min.js"></script>
