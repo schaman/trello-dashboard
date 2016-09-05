@@ -7,7 +7,7 @@ var margin = {top: 5, right: 5, bottom: 20, left: 100},
 
 var height = barHeight * data.length; // update me
 
-// define range
+// x – time scale
 var x = d3.scaleTime()
     .domain([new Date("2016-06-14T10:49:02.000Z"), new Date("2016-09-05T08:30:09.839Z")])
 //    .domain([
@@ -15,7 +15,11 @@ var x = d3.scaleTime()
 //      d3.max(data, function(d){ return d.finish })])
     .range([0, width]);
 
+// y - person scale
 var y = d3.scaleBand();
+
+// z - state scale
+var z = d3.scaleOrdinal();
 
 // set size and margins
 var chart = d3.select(".chart")
@@ -31,6 +35,19 @@ chart.append("g")
     .attr("transform", "translate(0," + barHeight * data.length + ")")
     .call(xAxis);
 
+// подбираем цвет для каждого состояния
+function setStates(lists) {
+  var color = d3.scaleSequential(d3.interpolatePlasma);
+
+  z.domain(lists.map(function(item){
+    return item.id;
+  }))
+
+  z.range(lists.map(function(item, i, a){
+    return color(i / a.length);
+  }))
+}
+
 function render(card, story) {
   data.push({
     card: card,
@@ -39,7 +56,7 @@ function render(card, story) {
 
   height = barHeight * data.length; // update me
 
-  y.domain(data.map(function(d) { console.log(d.card.name); return d.card.name; }));
+  y.domain(data.map(function(d) { /*console.log(d.card.name);*/ return d.card.name; }));
   y.rangeRound([0, height]);
 
   var yAxis = d3.axisLeft(y);
@@ -48,9 +65,15 @@ function render(card, story) {
       .call(yAxis);
 
   // add height to chart
-
   chart.attr("height", height + margin.top + margin.bottom);
   chart.select(".x").attr("transform", "translate(0," + barHeight * data.length + ")");
+
+  // check bounds
+  story.map(function(item){
+    if (x.domain()[0] > item.start) {
+      x.domain([item.start, x.domain()[1]])
+    }
+  })
 
   // shift every next bar down
   var person = chart.selectAll("g.person")
@@ -67,14 +90,17 @@ function render(card, story) {
   // add bars
   bar.append("rect")
       .attr("x", function(d) { return x(d.start); })
+      .attr("fill", function(d) { return z(d.state); })
       .attr("width", function(d) { return x(d.finish) - x(d.start); })
       .attr("height", barHeight - 1);
 
+/*
   bar.append("text")
       .attr("x", function(d) { return x(d.finish) - 3; })
       .attr("y", barHeight / 2)
       .attr("dy", ".35em")
       .text(function(d) { return d.state; });
+*/
 }
 
 function tellStory(card, story){
@@ -136,10 +162,10 @@ document.addEventListener('trelloReady', function(event){
             }
             story.push({
               date: action.date,
-              listBefore: action.data.listBefore.name,
-              listAfter: action.data.listAfter.name
+              listBefore: action.data.listBefore.id,
+              listAfter: action.data.listAfter.id
             });
-            lastListId = action.data.listBefore.name;
+            lastListId = action.data.listBefore.id;
           }
         })
 
@@ -165,7 +191,9 @@ document.addEventListener('trelloReady', function(event){
   })
   Trello.get('board/' + boardId + '/lists', function(lists) {
     lists = lists.filter(function(list){
-      return (excludeListIds.indexOf(list.idList) < 0);
+      return (excludeListIds.indexOf(list.id) < 0);
     })
+
+    setStates(lists);
   })
 })
