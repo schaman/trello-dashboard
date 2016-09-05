@@ -1,26 +1,61 @@
 var data = [];
 var totalStudentCount;
-var states = {};
+var states = [
+  {
+    name: 'Свежие лиды',     
+    color: '#0d0887', 
+    ids: ['569f823006dc53595355c866','57ab5914b419ce8b3eaa798c']
+  },
+  {
+    name: 'Дозваниваюсь',    
+    color: '#5c01a6', 
+    ids: ['56a5dcb3c2058bcc8d36f312','57ab5918b6ce1ee87dad2e4f']
+  },
+  {
+    name: 'Утепляю',         
+    color: '#9c179e', 
+    ids: ['573304f2ffb312d29a156193']
+  },
+  {
+    name: 'В работе',        
+    color: '#cc4778', 
+    ids: ['56a5dcceb432ecf074681bca','57ab591c36e3767f77743e61']
+  },
+  {
+    name: 'Горячие',         
+    color: '#ed7953', 
+    ids: ['56a5dce071e24b113b761a98']
+  },
+  {
+    name: 'Внес предоплату',
+    color: '#fdb42f', 
+    ids: ['56fa7cce00d210716bde0476','57ab59251706c8148ebb31f6']
+  },
+  {
+    name: 'past due',       
+    color: '#d9534f', 
+    ids: ['pastdue']
+  },
+  {
+    name: 'due',  
+    color: '#cccccc', 
+    ids: ['due']
+  },
+];
+
+var mindate = moment().subtract(90, 'days');
+var maxdate = moment().add(14, 'days');
 
 // z - state scale
 var z = d3.scaleOrdinal();
 
-// подбираем цвет для каждого состояния
-function setStates(lists) {
-  var color = d3.scaleSequential(d3.interpolatePlasma);
+z.domain(states.map(function(item, idx){
+  return idx;
+}))
 
-  z.domain(lists.map(function(item){
-    return item.id;
-  }))
-
-  z.range(lists.map(function(item, i, a){
-    return color(i / a.length);
-  }))
-
-  lists.map(function(list){
-    states[list.id] = list;
-  })
-}
+z.range(states.map(function(item, idx, arr){
+  return item.color;
+}))
 
 var barHeight = 26;
 
@@ -43,9 +78,21 @@ var tip = d3.tip()
   .html(function(d) {
     var start = moment(d.start);
     var finish = moment(d.finish);
-    return states[d.state].name + ' ' + 
-      start.format('D MMM') + ' – ' + finish.format('D MMM') +
-      ' (' + finish.diff(start, 'days') + ' days)';
+
+    var name = '(другой список)';
+    if (states[d.stateIndex]) {
+      name = states[d.stateIndex].name;
+    }
+
+    if (d.state == 'due') {
+      return name + ' ' + 
+        finish.format('D MMM') +
+        ' (in ' + finish.diff(start, 'days') + ' days)';
+    } else {
+      return name + ' ' + 
+        start.format('D MMM') + ' – ' + finish.format('D MMM') +
+        ' (' + finish.diff(start, 'days') + ' days)';
+    }
   })
 
 chart.call(tip);
@@ -76,12 +123,12 @@ function render() {
   height = barHeight * data.length;
 
   x.domain([
-    d3.min(data, function(person){
-      return d3.min(person.story, function(d){ return d.start })
-    }),
-    d3.max(data, function(person){
-      return d3.max(person.story, function(d){ return d.finish })
-    })
+    d3.max([mindate, d3.min(data, function(person){
+      return d3.min(person.story, function(d){ return d.start });
+    })]),
+    d3.min([maxdate, d3.max(data, function(person){
+      return d3.max(person.story, function(d){ return d.finish });
+    })])
   ]);
 
   y.domain(data.map(function(d) { return d.card.name; }));
@@ -109,14 +156,19 @@ function render() {
 
   bars.enter().append("rect")
       .attr("class", "bar")
-      .attr("fill", function(d) { return z(d.state); })
+      .attr("fill", function(d) { return z(d.stateIndex); })
       .attr("height", barHeight - 1)
+      .attr("url", function(d) { return d.url; })
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide)
+      .on('click', function(){
+        window.open(this.getAttribute('url'), '_blank');
+      })
 
   chart.selectAll("g.person").selectAll(".bar")
-      .attr("x", function(d) { return x(d.start); })
-      .attr("width", function(d) { return x(d.finish) - x(d.start); })
+      .attr("x", function(d) { return x(d3.max([mindate, d.start])); })
+      .attr("width", function(d) {
+          return d3.max([0, x(d3.min([maxdate, d.finish])) - x(d3.max([mindate, d.start]))]) })
 
   svg.attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right));
 }
@@ -127,10 +179,22 @@ function tellStory(card, story){
 
   var scenes = [];
   for (var i = story.length - 1; i >= 1; i--) {
+    var state = story[i].listAfter;
+    var stateIndex = -1;
+
+    // находим это состояние в справочнике состояний и сохраняем индекс
+    states.map(function(item, idx){
+      if (item.ids.indexOf(state) >= 0) {
+        stateIndex = idx;
+      }
+    })
+
     scenes.push({
       start: new Date(story[i].date),
       finish: new Date(story[i-1].date),
-      state: story[i].listAfter
+      state: story[i].listAfter,
+      stateIndex: stateIndex,
+      url: card.url
     });
   }
 
@@ -139,19 +203,59 @@ function tellStory(card, story){
     story: scenes
   })
 
-  //if (data.length == totalStudentCount) {
-    render();
-  //}
+  render();
 }
 
-// '57ab590ca071b05c3500cf53' // Продажи по трафику Лего (доска)
-// '57ab5914b419ce8b3eaa798c' // Свежие лиды
-// '57ab5918b6ce1ee87dad2e4f' // Дозваниваюсь
-// '57ab591c36e3767f77743e61' // В работе
-// '57ab59251706c8148ebb31f6' // Внес предоплату
-// '57ab592d75e92d2cddaedad3' // Оплатил полностью
-// '57ab5932fa2bd983186b0d73' // Закрыт
-// '57cbfdaeb2e54bedc6966956' // Контроль
+// историю карточки передаём в tellStory
+function getStory(card, actions) {
+  var story = []; // card movements history [date, listBefore, listAfter]  
+  var now = new Date();
+  var due = new Date(card.due);
+
+  if (due > now) {
+    story.push({
+      date: due,
+      listBefore: 'due',
+      listAfter: null
+    });
+    story.push({
+      date: now,
+      listBefore: card.idList,
+      listAfter: 'due'
+    });
+  } else {
+    story.push({
+      date: now,
+      listBefore: card.idList,
+      listAfter: null
+    });
+  }
+
+  var lastListId = card.idList;
+  actions.map(function(action){
+    if (action.type == 'updateCard' && action.data.listBefore) {
+      if (story.length == 1) {
+        // hack – get last item name from action record
+        //story[0][1] = action.data.listAfter.name;
+      }
+      story.push({
+        date: action.date,
+        listBefore: action.data.listBefore.id,
+        listAfter: action.data.listAfter.id
+      });
+      lastListId = action.data.listBefore.id;
+    }
+  })
+
+  var cardCreated = new Date(1000*parseInt(card.id.substring(0,8),16));
+  story.push({
+    date: cardCreated,
+    listBefore: null,
+    listAfter: lastListId
+  });
+
+  tellStory(card, story);
+}
 
 document.addEventListener('trelloReady', function(event){
   var boardId = '569f82270e721e71ac52311c'; // Продажи (доска)
@@ -171,57 +275,39 @@ document.addEventListener('trelloReady', function(event){
     '573395c2ef63a077a40b3140', // Возражения
     '56a5dcc5636be20ab7d427f7', // Вторая очередь
   ];
-  Trello.get('board/' + boardId + '/cards', function(cards) {
+  Trello.get('board/' + boardId + '/cards', function(exclusions, cards) {
     cards = cards.filter(function(card){
-      // убираем карточки в списке МЕТА и карточки с лейблами
-      return (excludeListIds.indexOf(card.idList) < 0) && (card.idLabels.length == 0);
+      return (exclusions.indexOf(card.idList) < 0);
     })
 
     // запоминаем, сколько всего студентов
     totalStudentCount = cards.length;
 
     cards.map(function(card){
-      Trello.get('card/' + card.id + '/actions', function(card, actions){
-        var story = []; // card movements history [date, listBefore, listAfter]
-        var now = new Date();
-        story.push({
-          date: now,
-          listBefore: card.idList,
-          listAfter: null
-        });
-
-        var lastListId = card.idList;
-        actions.map(function(action){
-          if (action.type == 'updateCard' && action.data.listBefore) {
-            if (story.length == 1) {
-              // hack – get last item name from action record
-              //story[0][1] = action.data.listAfter.name;
-            }
-            story.push({
-              date: action.date,
-              listBefore: action.data.listBefore.id,
-              listAfter: action.data.listAfter.id
-            });
-            lastListId = action.data.listBefore.id;
-          }
-        })
-
-        var cardCreated = new Date(1000*parseInt(card.id.substring(0,8),16));
-        story.push({
-          date: cardCreated,
-          listBefore: null,
-          listAfter: lastListId
-        });
-
-        tellStory(card, story);
-      }.bind(null, card))
+      Trello.get('card/' + card.id + '/actions', getStory.bind(null, card));
     })
-  })
-  Trello.get('board/' + boardId + '/lists', function(lists) {
-    lists = lists.filter(function(list){
-      return (excludeListIds.indexOf(list.id) < 0);
+  }.bind(null, excludeListIds))
+
+  var boardId = '57ab590ca071b05c3500cf53'; // Продажи по трафику Лего (доска)
+  var excludeListIds = [
+    // '57ab5914b419ce8b3eaa798c' // Свежие лиды
+    // '57ab5918b6ce1ee87dad2e4f' // Дозваниваюсь
+    // '57ab591c36e3767f77743e61' // В работе
+    // '57ab59251706c8148ebb31f6' // Внес предоплату
+    '57ab592d75e92d2cddaedad3', // Оплатил полностью
+    '57ab5932fa2bd983186b0d73', // Закрыт
+    '57cbfdaeb2e54bedc6966956' // Контроль
+  ];
+  Trello.get('board/' + boardId + '/cards', function(exclusions, cards) {
+    cards = cards.filter(function(card){
+      return (exclusions.indexOf(card.idList) < 0);
     })
 
-    setStates(lists);
-  })
+    // запоминаем, сколько всего студентов
+    totalStudentCount = cards.length;
+
+    cards.map(function(card){
+      Trello.get('card/' + card.id + '/actions', getStory.bind(null, card));      
+    })
+  }.bind(null, excludeListIds))
 })
