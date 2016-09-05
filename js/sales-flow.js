@@ -113,10 +113,8 @@ function render() {
       .attr("height", barHeight - 1)
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide)
-      .attr("x", function(d) { return x(d.start); })
-      .attr("width", function(d) { return x(d.finish) - x(d.start); })
 
-  bars
+  chart.selectAll("g.person").selectAll(".bar")
       .attr("x", function(d) { return x(d.start); })
       .attr("width", function(d) { return x(d.finish) - x(d.start); })
 
