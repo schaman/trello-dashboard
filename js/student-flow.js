@@ -1,13 +1,20 @@
 var data = [];
 var states = {
-  'due': { name: 'due' }
+  'due': { name: 'due' },
+  'no due': { name: 'no due' },
+  'past due': { name: 'past due' },
 };
 
 var mindate = moment().subtract(90, 'days');
 var maxdate = moment().add(14, 'days');
 
-// z - state scale
-var z = d3.scaleOrdinal();
+// z1 - state scale
+var z1 = d3.scaleOrdinal();
+
+// z2 - due state scale
+var z2 = d3.scaleOrdinal();
+z2.domain(['no due', 'due', 'past due']);
+z2.range(['#f0ad4e', '#5cb85c', '#d9534f']);
 
 // подбираем цвет для каждого состояния
 function setStates(lists) {
@@ -24,8 +31,8 @@ function setStates(lists) {
   domain.push('due');
   range.push('#cccccc')
 
-  z.domain(domain);
-  z.range(range);
+  z1.domain(domain);
+  z1.range(range);
 
   lists.map(function(list){
     states[list.id] = list;
@@ -33,10 +40,11 @@ function setStates(lists) {
 }
 
 var barHeight = 26;
+var lineHeight = 8;
 
 var margin = {top: 10, right: 170, bottom: 20, left: 10},
     width = 1120 - margin.left - margin.right
-    height = barHeight * data.length;
+    height = (barHeight + lineHeight) * data.length;
 
 // set size and margins
 var svg = d3.select(".chart")
@@ -59,15 +67,16 @@ var tip = d3.tip()
       name = states[d.state].name;
     }
 
+/*
     if (d.state == 'due') {
       return name + ' ' + 
         finish.format('D MMM') +
         ' (in ' + finish.diff(start, 'days') + ' days)';
-    } else {
+    } else {*/
       return name + ' ' + 
         start.format('D MMM') + ' – ' + finish.format('D MMM') +
         ' (' + finish.diff(start, 'days') + ' days)';
-    }
+    //}
   })
 
 chart.call(tip);
@@ -95,14 +104,14 @@ chart.append("g")
     .call(yAxis);
 
 function render() {
-  height = barHeight * data.length;
+  height = (barHeight + lineHeight) * data.length;
 
   x.domain([
     d3.max([mindate, d3.min(data, function(person){
-      return d3.min(person.story, function(d){ return d.start });
+      return d3.min(person.stateStory, function(d){ return d.start });
     })]),
     d3.min([maxdate, d3.max(data, function(person){
-      return d3.max(person.story, function(d){ return d.finish });
+      return d3.max(person.stateStory, function(d){ return d.finish });
     })])
   ]);
 
@@ -124,14 +133,17 @@ function render() {
   // shift every next bar down
   var person = people.enter().append("g")
       .attr("class", "person")
-      .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; });
+      .attr("transform",
+        function(d, i) { return "translate(0," + i * (barHeight + lineHeight) + ")"; });
+
+  // telling state story
 
   var bars = chart.selectAll("g.person").selectAll(".bar")
-      .data(function(d) { return d.story; }, function(d) { return d.state; });
+      .data(function(d) { return d.stateStory; }, function(d) { return d.state; });
 
   bars.enter().append("rect")
       .attr("class", "bar")
-      .attr("fill", function(d) { return z(d.state); })
+      .attr("fill", function(d) { return z1(d.state); })
       .attr("height", barHeight - 1)
       .attr("url", function(d) { return d.url; })
       .on('mouseover', tip.show)
@@ -145,25 +157,113 @@ function render() {
       .attr("width", function(d) {
           return d3.max([0, x(d3.min([maxdate, d.finish])) - x(d3.max([mindate, d.start]))]) })
 
+  // telling due story
+
+  var lines = chart.selectAll("g.person").selectAll(".line")
+      .data(function(d) { return d.dueStory; }, function(d) { return d.state; });
+
+  lines.enter().append("rect")
+      .attr("class", "line")
+      .attr("fill", function(d) { return z2(d.state); })
+      .attr("height", lineHeight - 1)
+      .attr("y", barHeight)
+      .attr("url", function(d) { return d.url; })
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide)
+      .on('click', function(){
+        window.open(this.getAttribute('url'), '_blank');
+      })
+
+  chart.selectAll("g.person").selectAll(".line")
+      .attr("x", function(d) { return x(d3.max([mindate, d.start])); })
+      .attr("width", function(d) {
+          return d3.max([0, x(d3.min([maxdate, d.finish])) - x(d3.max([mindate, d.start]))]) })
+
   svg.attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right));
 }
 
-function tellStory(card, story){
+function tellStory(card, stateStory, dueStory){
+
   // переводим историю из списка состояний [дата, состояние до, состояние после]
   // в список отрезков [дата начала, дата окончания, состояние]
 
-  var scenes = [];
-  for (var i = story.length - 1; i >= 1; i--) {
-    scenes.push({
-      start: new Date(story[i].date),
-      finish: new Date(story[i-1].date),
-      state: story[i].listAfter
+  var newStateStory = [];
+  for (var i = stateStory.length - 1; i >= 1; i--) {
+    newStateStory.push({
+      start: new Date(stateStory[i].date),
+      finish: new Date(stateStory[i-1].date),
+      state: stateStory[i].listAfter,
+      url: card.url
     });
+  }
+
+  // переводим dueStory в список состояний [ дата начала, дата окончания, состояние ]
+  // где состояние — одно из (no due | due | past due)
+
+  function decodeDates(obj) {
+    var res = {};
+    for (var key in obj) {
+      if (obj[key]) {
+        res[key] = new Date(obj[key])
+      } else {
+        res[key] = null;
+      }
+    }
+    return res;
+  }
+
+  var newDueStory = [];
+  for (var i = dueStory.length - 1; i >= 1; i--) {
+    var my = decodeDates(dueStory[i]), next = decodeDates(dueStory[i-1]);
+    if (my.dueAfter) {
+      // срок будет либо до самого срока, либо до следующего изменения
+      if (next.date < my.dueAfter) {
+        // если мой срок перекрывает дату следующей карточки,
+        // то интервал заканчиваем на дате следующей карточки
+
+        if (i == 1) { // последнюю карточку заканчиваем в будущем, а не сегодня
+          newDueStory.push({
+            start: my.date,
+            finish: my.dueAfter,
+            state: 'due'
+          })
+        } else {
+          newDueStory.push({
+            start: my.date,
+            finish: next.date,
+            state: 'due'
+          })
+        }
+
+      } else {
+        // если мой срок не достаёт до даты следующей карточки,
+        // то делаем две карточки — для текущего интервала и для просрочки
+
+        newDueStory.push({
+          start: my.date,
+          finish: my.dueAfter,
+          state: 'due'
+        })
+
+        newDueStory.push({
+          start: my.dueAfter,
+          finish: next.date,
+          state: 'past due'
+        })
+      }
+    } else {
+      newDueStory.push({
+        start: my.date,
+        finish: next.date,
+        state: 'no due'
+      })
+    }
   }
 
   data.push({
     card: card,
-    story: scenes
+    stateStory: newStateStory,
+    dueStory: newDueStory
   })
 
   render();
@@ -171,53 +271,71 @@ function tellStory(card, story){
 
 // историю карточки передаём в tellStory
 function getStory(card, actions) {
-  var story = []; // card movements history [date, listBefore, listAfter]  
+  var stateStory = []; // card movements history [date, listBefore, listAfter]
+  var dueStory = []; // card due_date history [date, dueBefore, dueAfter]
   var now = new Date();
   var due = new Date(card.due);
 
   if (due > now) {
-    story.push({
+    stateStory.push({
       date: due,
       listBefore: 'due',
       listAfter: null
     });
-    story.push({
+    stateStory.push({
       date: now,
       listBefore: card.idList,
       listAfter: 'due'
     });
   } else {
-    story.push({
+    stateStory.push({
       date: now,
       listBefore: card.idList,
       listAfter: null
     });
   }
 
+  dueStory.push({
+    date: now,
+    dueBefore: card.due,
+    dueAfter: null
+  })
+
   var lastListId = card.idList;
+  var lastDue = card.due;
   actions.map(function(action){
     if (action.type == 'updateCard' && action.data.listBefore) {
-      if (story.length == 1) {
-        // hack – get last item name from action record
-        //story[0][1] = action.data.listAfter.name;
-      }
-      story.push({
+      stateStory.push({
         date: action.date,
         listBefore: action.data.listBefore.id,
         listAfter: action.data.listAfter.id
       });
       lastListId = action.data.listBefore.id;
     }
+    if (action.type == 'updateCard' && ('old' in action.data) && ('due' in action.data.old)) {
+      dueStory.push({
+        date: action.date,
+        dueBefore: action.data.old.due,
+        dueAfter: action.data.card.due
+      });
+      lastDue = action.data.old.due;
+    }
   })
 
   var cardCreated = new Date(1000*parseInt(card.id.substring(0,8),16));
-  story.push({
+  stateStory.push({
     date: cardCreated,
     listBefore: null,
     listAfter: lastListId
   });
 
-  tellStory(card, story);
+  dueStory.push({
+    date: cardCreated,
+    dueBefore: null,
+    dueAfter: lastDue
+  })
+
+  tellStory(card, stateStory, dueStory);
 }
 
 document.addEventListener('trelloReady', function(event){
@@ -229,8 +347,11 @@ document.addEventListener('trelloReady', function(event){
       return (excludeListIds.indexOf(card.idList) < 0) && (card.idLabels.length == 0);
     })
 
-    cards.map(function(card){
-      Trello.get('card/' + card.id + '/actions', getStory.bind(null, card))
+    cards.map(function(card, i){
+      Trello.get(
+        'card/' + card.id + '/actions',
+        { filter: 'updateCard' },
+        getStory.bind(null, card))
     })
   })
   Trello.get('board/' + boardId + '/lists', function(lists) {
