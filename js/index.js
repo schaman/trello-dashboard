@@ -1,10 +1,19 @@
+var teamMembers = {};
+var teamMembersLoaded, domLoaded;
+
+domLoaded = $.Deferred(function(dfd) {
+  $(function(){
+    dfd.resolve();
+  })
+}).promise();
+
 function startChecking(title, checker) {
   function failCheck(card, msg) {
     check.errors.push({ card: card, msg: msg });
   }
 
   function endChecking() {
-    $(function(){
+    $.when(teamMembersLoaded, domLoaded).then(function(){
       if (check.errors.length == 0) {
         $('#content').append(
           '<li><h4><span class="label label-success">PASS</span> ' + check.title + '</h4></li>');
@@ -14,8 +23,13 @@ function startChecking(title, checker) {
         for (var i = check.errors.length - 1; i >= 0; i--) {
           var error = check.errors[i];
           $('#content').append(
-            '<li><span class="label label-default">' + error.msg + '</span>' +
-            ' <a target="_blank" href="' + error.card.url + '">' + error.card.name + '</a></li>');
+            '<li><span class="label label-default">' + error.msg + '</span> ' +
+            (error.card.idMembers.map(function(m) {
+              return ' ' + teamMembers[m];
+            }).join(',')) +
+            (error.card.due ? moment(error.card.due).format(' D MMM') : '') +
+            ' <a target="_blank" href="' + error.card.url + '">' + error.card.name + '</a>' +
+            '</li>');
         }
       }
     })
@@ -84,6 +98,15 @@ function getBoardCards(boardId, excludeListIds, cb) {
 }
 
 document.addEventListener('trelloReady', function(event){
+  teamMembersLoaded = $.Deferred(function(dfd) {
+    Trello.get('organizations/utki/members', {fields: 'initials'}, function(members) {
+      members.map(function(member){
+        teamMembers[member.id] = member.initials;
+      })
+      dfd.resolve();
+    });
+  }).promise();
+
   startChecking(
     'С каждым участником тренинга созданы договорённости о сроках',
     function(failCheck, endChecking) {
