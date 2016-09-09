@@ -2,8 +2,8 @@
 /************************** GET DATA ************************/
 /************************************************************/
 
-var historySince = moment().subtract(7, 'days');
-var actionsLimit = 500;
+var historySince = moment().subtract(5, 'days');
+var actionsLimit = 1000;
 //var boardIds = ['569f25465720569236ec321d']; // Инновации
 
 var data = {

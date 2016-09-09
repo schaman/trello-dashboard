@@ -1,8 +1,8 @@
 ---
 layout: dashboard
 group: navigation
-title: Daily Activity
-js: daily-activity
+title: Lead Generation
+js: leadgen
 ---
 
 <style>
@@ -21,19 +21,7 @@ js: daily-activity
 
 .chart circle {
   fill: navy;
-  /*
-  stroke: steelblue;
-  fill: none;
-  stroke-width: 3;
-  opacity: 0.5;
-  */
 }
-
-/*
-.chart circle.night {
-  fill: #ccc;
-}
-*/
 
 .chart line.verticalGrid {
   fill: none;
@@ -88,9 +76,28 @@ js: daily-activity
   top: 100%;
   left: 0;
 }
+
+
+#content {
+  margin-top: 50px;
+}
 </style>
 
 <svg class="chart"></svg>
 
+<table class="table table-bordered table-striped" id="content">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Source</th>
+      <th>Landing Page</th>
+      <th>Name</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+
 <script type="text/javascript" src="/js/d3/d3.min.js"></script>
 <script type="text/javascript" src="/js/lib/d3.tip.js"></script>
+<script type="text/javascript" src="/js/lib/parseUri.js"></script>
