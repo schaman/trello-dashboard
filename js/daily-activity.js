@@ -4,11 +4,13 @@
 
 var historySince = moment().subtract(5, 'days');
 var actionsLimit = 1000;
+var detailedHistorySince = moment().subtract(1, 'days');
 //var boardIds = ['569f25465720569236ec321d']; // Инновации
 
 var data = {
   members: {},
   boards: {},
+  detailedHistory: []
 };
 
 var loaded = {
@@ -90,6 +92,17 @@ function processBoard(board){
     } else {
       member.actions[hour] = 1;
     }
+
+    if (moment(action.date) > detailedHistorySince) {
+      data.detailedHistory.push({
+        date: new Date(action.date),
+        member: action.memberCreator,
+        type: action.type,
+        board: action.data.board,
+        list: action.data.list,
+        card: action.data.card
+      })
+    }
   })
 
   if (board.actions.length == actionsLimit) {
@@ -137,16 +150,44 @@ loaded.boardList.done(function(){
           var m = moment(hour);
           newData.push({
             date: m,
-            name: member.fullName,
-            night: (m.hours() < 8 || m.hours() > 20)
+            name: member.fullName
           })
         }
       }
     }
 
     render(newData);
+    renderTable(data.detailedHistory);
   })
 });
+
+function ellipsis(str, len) {
+  if (str.length <= len) return str;
+  return str.substring(0, len-3) + '...';
+}
+
+function renderTable(data) {
+  var rows = d3.select("#content tbody")
+    .selectAll("tr")
+    .data(data.sort(function(a,b){
+      return b.date - a.date;
+    }));
+  
+  rows.exit().remove();
+
+  tr = rows.enter().append("tr");
+  tr.append('td').text(function(d) { return moment(d.date).format('lll'); });
+  tr.append('td').text(function(d) { return d.member.fullName; });
+  tr.append('td').text(function(d) { return d.action; });
+  tr.append('td').text(function(d) { return d.board.name + (d.list ? ' ' + d.list.name : ''); });
+  tr.append('td')
+    .append('a')
+      .attr('href', function(d) {
+        return d.card ? 'http://trello.com/c/' + d.card.shortLink : '';
+      })
+      .attr('target', '_blank')
+      .text(function(d) { return d.card ? ellipsis(d.card.name, 40) : ''; });
+}
 
 function render(data) {
 
@@ -181,6 +222,16 @@ var yAxis = d3.axisLeft(y).ticks(d3.timeMinute.every(15));
 chart.append("g")
     .attr("class", "y axis");
 
+// tip
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-10, 0])
+  .html(function(d) {
+    return moment(d.date).format('HH:00')
+  })
+
+chart.call(tip);
+
 // render
 
   x.domain(d3.extent(data, function(d) { return d.date; }));
@@ -206,10 +257,14 @@ chart.append("g")
   circles.exit().remove();
 
   var circle = circles.enter().append("circle")
-      .attr("r", 5)
-      .attr("class", function(d) { return (d.night ? 'night' : ''); })
+      .attr("r", 6)
       .attr("cx", function(d) { return x(d.date); })
       .attr("cy", function(d) { return y(d.name) + rowHeight / 2; })
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide)
+      .on('click', function(){
+        window.open(this.getAttribute('url'), '_blank');
+      })
 
 // gridlines
 //debugger;
