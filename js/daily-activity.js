@@ -315,7 +315,7 @@ chart.call(tip);
   y.domain(data.map(function(d) { return d.name; }));
 
   height = rowHeight * y.domain().length;
-  svg.attr("viewBox", "0 0 1120 " + (height + margin.left + margin.right));
+  svg.attr("viewBox", "0 0 1120 " + (height + margin.top + margin.bottom));
 
   y.rangeRound([0, height]);
 
