@@ -9,6 +9,7 @@ var detailedHistorySince = moment().subtract(1, 'days');
 
 var data = {
   members: {},
+  membersArray: [],
   boards: {},
   detailedHistory: []
 };
@@ -79,11 +80,16 @@ function processBoard(board){
   var members = board.members = {};
 
   board.actions.map(function(action){
-    var member = members[action.memberCreator.id];
+    var memberId = action.memberCreator.id;
+    var member = members[memberId];
     if (!member) {
       member = action.memberCreator;
       member.actions = {};
-      members[action.memberCreator.id] = member;
+      members[memberId] = member;
+
+      if (!(memberId in data.members)) {
+        data.members[memberId] = action.memberCreator;
+      }
     }
 
     var hour = moment(action.date).startOf('hour').toISOString();
@@ -94,14 +100,50 @@ function processBoard(board){
     }
 
     if (moment(action.date) > detailedHistorySince) {
-      data.detailedHistory.push({
-        date: new Date(action.date),
+      var newAction = {
+        id: action.id,
+        date: moment(action.date),
         member: action.memberCreator,
-        type: action.type,
+        types: [action.type],
         board: action.data.board,
         list: action.data.list,
         card: action.data.card
-      })
+      }
+
+      function similarActions(a1, a2) {
+        if (a1.member.id !== a2.member.id) { return false; }
+        if (typeof a1.board !== typeof a2.board) { return false; }
+        if (typeof a1.list !== typeof a2.list) { return false; }
+        if (typeof a1.card !== typeof a2.card) { return false; }
+        if (a1.board && a1.board.id !== a2.board.id) { return false; }
+        if (a1.list && a1.list.id !== a2.list.id) { return false; }
+        if (a1.card && a1.card.id !== a2.card.id) { return false; }
+
+        // 5 minutes
+        if (Math.abs(moment(a2.date).diff(a1.date)) > 5 * 60 * 1000) { return false; }
+
+        return true;
+      }
+
+      // join series of common actions together
+      for (var i = data.detailedHistory.length - 1; i >= 0; i--) {
+        var action = data.detailedHistory[i];
+
+        if (similarActions(action, newAction)) {
+          action.types = action.types
+            .concat(newAction.types)
+            .filter(function(item, pos, arr){
+              // unique
+              return pos === 0 || item !== arr[pos-1];
+            });
+          newAction = null;
+          break;
+        }
+      }
+
+      if (newAction) {
+        data.detailedHistory.push(newAction);
+      }
     }
   })
 
@@ -157,28 +199,41 @@ loaded.boardList.done(function(){
     }
 
     render(newData);
-    renderTable(data.detailedHistory);
+
+    data.membersArray = [];
+    for (var member in data.members) { data.membersArray.push(data.members[member]); }
+
+    renderTable(data.detailedHistory, data.membersArray);
   })
 });
 
 function ellipsis(str, len) {
+  if (str.length == 0) return '...';
   if (str.length <= len) return str;
   return str.substring(0, len-3) + '...';
 }
 
-function renderTable(data) {
+function renderTable(data, members, activeId) {
+  if (activeId) {
+    data = data.filter(function(action){
+      return action.member.id == activeId;
+    })
+  }
+
+  var sorted = data.sort(function(a,b){
+    return b.date - a.date;
+  });
+
   var rows = d3.select("#content tbody")
     .selectAll("tr")
-    .data(data.sort(function(a,b){
-      return b.date - a.date;
-    }));
+    .data(sorted, function(d) { return d.id });
   
   rows.exit().remove();
 
   tr = rows.enter().append("tr");
   tr.append('td').text(function(d) { return moment(d.date).format('lll'); });
   tr.append('td').text(function(d) { return d.member.fullName; });
-  tr.append('td').text(function(d) { return d.action; });
+  tr.append('td').text(function(d) { return d.types.join(', '); });
   tr.append('td').text(function(d) { return d.board.name + (d.list ? ' ' + d.list.name : ''); });
   tr.append('td')
     .append('a')
@@ -187,7 +242,29 @@ function renderTable(data) {
       })
       .attr('target', '_blank')
       .text(function(d) { return d.card ? ellipsis(d.card.name, 40) : ''; });
+
+  var tabs = d3.select("#filter")
+    .selectAll("li.member")
+    .data(members);
+
+  tabs.exit().remove();
+
+  tab = tabs.enter()
+    .append("li")
+      .attr('class', 'member')
+      .append('a')
+        .attr('href', function(d) { return d.id })
+        .text(function(d) { return d.fullName })
 }
+
+$(function(){
+  $('#filter').on('click', 'a', function(e) {
+    e.preventDefault();
+    $('#filter li').removeClass('active');
+    $(this).parent().addClass('active');
+    renderTable(data.detailedHistory, data.membersArray, $(this).attr('href'));
+  });
+})
 
 function render(data) {
 
