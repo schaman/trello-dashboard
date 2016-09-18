@@ -8,7 +8,7 @@ var authenticationSuccess = function() {
 Trello.authorize({
   type: 'redirect',//'popup',
   //persist: false,
-  name: 'Prorealnost Trello Dashboard',
+  name: 'Trello Dashboard',
   scope: {
     read: 'true',
     write: 'true' },

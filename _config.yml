@@ -1,5 +1,5 @@
 baseurl: ""
-url: "http://dashboard.prorealnost.com"
+url: "http://dashboard.nickvorobiov.com"
 markdown: kramdown
 exclude:
   - node_modules
